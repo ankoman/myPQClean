@@ -2,7 +2,7 @@
 
 # override as desired
 TYPE=kem
-SCHEME=ml-kem-768
+SCHEME=ml-kem-512
 IMPLEMENTATION=clean
 KAT_RNG=nist
 
@@ -42,13 +42,14 @@ endif
 # This -Wall was supported by the European Commission through the ERC Starting Grant 805031 (EPOQUE)
 CFLAGS=-O3 -Wall -Wextra -Wpedantic -Wvla -Werror -std=c99 \
 	   -Wundef -Wshadow -Wcast-align -Wpointer-arith -Wmissing-prototypes\
-	   -fstrict-aliasing -fno-common -pipe \
+	   -fstrict-aliasing -fno-common -pipe -Wno-error=unused-function -Wno-error=unused-variable\
 	   -I$(COMMON_DIR) $(EXTRAFLAGS)
 
 # Number of tests run for functests
 NTESTS=1
 
-all: $(DEST_DIR)/functest_$(SCHEME)_$(IMPLEMENTATION) \
+all: $(DEST_DIR)/my_test_$(SCHEME)_$(IMPLEMENTATION) \
+	$(DEST_DIR)/functest_$(SCHEME)_$(IMPLEMENTATION) \
 	$(DEST_DIR)/testvectors_$(SCHEME)_$(IMPLEMENTATION) \
 	$(DEST_DIR)/printparams_$(SCHEME)_$(IMPLEMENTATION)
 
@@ -73,6 +74,9 @@ $(INTEROP_LIBRARY): $(INTEROP_FILES)
 clean-interop:
 	cd $(INTEROP_DIR) && $(MAKE) clean
 endif
+
+.PHONY: my_test
+functest: $(DEST_DIR)/my_test_$(SCHEME)_$(IMPLEMENTATION)
 
 .PHONY: functest
 functest: $(DEST_DIR)/functest_$(SCHEME)_$(IMPLEMENTATION)
@@ -103,6 +107,10 @@ $(DEST_DIR)/test_common_nistseedexpander: test_common/sp800-185.c $(COMMON_FILES
 	mkdir -p $(DEST_DIR)
 	$(CC) $(CFLAGS) $< $(COMMON_FILES) -o $@
 
+$(DEST_DIR)/my_test_$(SCHEME)_$(IMPLEMENTATION): $(SCHEME_LIBRARY) $(INTEROP_LIBRARY) crypto_$(TYPE)/my_test.c $(COMMON_FILES) $(COMMON_DIR)/randombytes.c $(COMMON_HEADERS)
+	mkdir -p $(DEST_DIR)
+	$(CC) $(CFLAGS) -DNTESTS=$(NTESTS) -DPQCLEAN_NAMESPACE=PQCLEAN_$(SCHEME_UPPERCASE)_$(IMPLEMENTATION_UPPERCASE) -I$(SCHEME_DIR) crypto_$(TYPE)/my_test.c $(COMMON_FILES) $(COMMON_DIR)/randombytes.c -o $@ -L$(SCHEME_DIR) -l$(SCHEME)_$(IMPLEMENTATION) $(EXTRALINKERFLAGS)
+
 $(DEST_DIR)/functest_$(SCHEME)_$(IMPLEMENTATION): $(SCHEME_LIBRARY) $(INTEROP_LIBRARY) crypto_$(TYPE)/functest.c $(COMMON_FILES) $(COMMON_DIR)/randombytes.c $(COMMON_HEADERS)
 	mkdir -p $(DEST_DIR)
 	$(CC) $(CFLAGS) -DNTESTS=$(NTESTS) -DPQCLEAN_NAMESPACE=PQCLEAN_$(SCHEME_UPPERCASE)_$(IMPLEMENTATION_UPPERCASE) -I$(SCHEME_DIR) crypto_$(TYPE)/functest.c $(COMMON_FILES) $(COMMON_DIR)/randombytes.c -o $@ -L$(SCHEME_DIR) -l$(SCHEME)_$(IMPLEMENTATION) $(EXTRALINKERFLAGS)
@@ -121,6 +129,7 @@ $(DEST_DIR)/nistkat_$(SCHEME)_$(IMPLEMENTATION): $(SCHEME_LIBRARY) crypto_$(TYPE
 
 .PHONY: clean
 clean:
+	$(RM) $(DEST_DIR)/my_test_$(SCHEME)_$(IMPLEMENTATION)
 	$(RM) $(DEST_DIR)/functest_$(SCHEME)_$(IMPLEMENTATION)
 	$(RM) $(DEST_DIR)/testvectors_$(SCHEME)_$(IMPLEMENTATION)
 	$(RM) $(DEST_DIR)/printparams_$(SCHEME)_$(IMPLEMENTATION)

@@ -34,6 +34,7 @@ def test_nistkat(implementation, impl_path, test_dir, init, destr):
     kat_rng = 'nist'
     if 'nistkat-rng' in implementation.scheme.metadata():
         kat_rng = implementation.scheme.metadata()['nistkat-rng']
+    print(implementation.scheme)
     helpers.make('nistkat',
                  TYPE=implementation.scheme.type,
                  SCHEME=implementation.scheme.name,

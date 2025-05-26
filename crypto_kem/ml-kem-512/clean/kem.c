@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 /*************************************************
 * Name:        PQCLEAN_MLKEM512_CLEAN_crypto_kem_keypair_derand
 *
@@ -33,6 +34,14 @@ int PQCLEAN_MLKEM512_CLEAN_crypto_kem_keypair_derand(uint8_t *pk,
     return 0;
 }
 
+static void printbytes(const uint8_t *x, size_t xlen) {
+    size_t i;
+    for (i = 0; i < xlen; i++) {
+        printf("%02x", x[i]);
+    }
+    printf("\n");
+}
+
 /*************************************************
 * Name:        PQCLEAN_MLKEM512_CLEAN_crypto_kem_keypair
 *
@@ -50,6 +59,8 @@ int PQCLEAN_MLKEM512_CLEAN_crypto_kem_keypair(uint8_t *pk,
         uint8_t *sk) {
     uint8_t coins[2 * KYBER_SYMBYTES];
     randombytes(coins, 2 * KYBER_SYMBYTES);
+    //printbytes(coins, 2 * KYBER_SYMBYTES);
+
     PQCLEAN_MLKEM512_CLEAN_crypto_kem_keypair_derand(pk, sk, coins);
     return 0;
 }
