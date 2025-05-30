@@ -11,7 +11,6 @@
 #include "indcpa.h"
 #include "reduce.h"
 
-#define NTESTS 1
 #define N_U 15
 
 static void printbytes(const uint8_t *x, size_t xlen) {
@@ -31,6 +30,17 @@ static void print_poly(const poly *p) {
         }
     }
     printf("]\n");
+}
+
+static inline uint64_t rdtsc(){
+    unsigned int lo, hi;
+    __asm__ volatile (
+        "cpuid\n"        // serialize
+        "rdtsc\n"        // read time-stamp counter
+        : "=a" (lo), "=d" (hi)
+        : "a" (0)
+        : "%ebx", "%ecx");
+    return ((uint64_t)hi << 32) | lo;
 }
 
 // https://stackoverflow.com/a/1489985/1711232
@@ -134,6 +144,8 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
     int16_t rot_ct[KYBER_N*2];
     polyvec pkpv, A_[KYBER_K], u, u_comp;
 
+    int DEBUG_ROT = 0, DEBUG_OFFSET = 0, DEBUG_CAND = 0, DEBUG_C = 0;
+
     row = 0;
     pos = 0;
     base = 0;
@@ -152,13 +164,18 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
     }
     
     for(int rot = 0; rot < KYBER_N; rot++) {
+        DEBUG_ROT++;
         center = rot_ct[base + KYBER_N - rot]; // Center value
         for (int offset = -2; offset <= 2; offset++) {
+            DEBUG_OFFSET++;
             candidate = approx((center + offset) % KYBER_Q);         // TODO: Barrett reduction
             if (candidate == center){
+                DEBUG_CAND++;
                 c = PQCLEAN_MLKEM512_CLEAN_montgomery_reduce(a0_inv * candidate);
                 if(c < 416 || c > 2913){
+                    DEBUG_C++;
                     cnt = cnt_invalid_coeffs(c, base, &(A_[row].vec[pos]), &u_comp.vec[pos]);
+                    // printf("%d\n", cnt);
                     if (cnt == N_U) {
                         return 1; // pk-mask detected
                     }
@@ -166,6 +183,7 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
             }       
         }
     }
+    //printf("%d, %d, %d, %d\n", DEBUG_ROT, DEBUG_OFFSET, DEBUG_CAND, DEBUG_C);
 
     // print_poly((poly *)rot_ct);
     // print_poly((poly *)(rot_ct + KYBER_N));
@@ -174,7 +192,11 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
     return 0; // pk-mask undetected
 }
 
+#define N_TESTS 1
+
+
 int main(void) {
+    uint64_t start = rdtsc();
     uint8_t key_a[CRYPTO_BYTES];
     // uint8_t pk[CRYPTO_PUBLICKEYBYTES];
     // uint8_t ct[CRYPTO_CIPHERTEXTBYTES];
@@ -186,8 +208,12 @@ int main(void) {
     size_t read_bytes = fread(buffer, 1, sizeof(buffer), stdin);
 
     // pk-mask check
-    return pk_mask_check(buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
+    for (volatile int i = 0; i < N_TESTS; i++){
+            pk_mask_check(buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
+    }
 
+    uint64_t end = rdtsc();
+    printf("Cycles: %f\n", (double)(end - start)/N_TESTS);
     // Decapsulation
     // crypto_kem_dec(key_a, buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
     // printbytes(key_a, CRYPTO_BYTES);
