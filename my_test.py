@@ -13,9 +13,9 @@ def main():
 
     cp = subprocess.run(['../bin/my_test_ml-kem-512_clean'], input = ct + pk,\
                         stdout=subprocess.PIPE)
-    # print(cp)
-    out = cp.stdout.decode('utf-8').split('/n')
-    print(out[0])
+    print(cp.returncode)
+    # out = cp.stdout.decode('utf-8').split('/n')
+    # print(out[0])
 
 if __name__ == "__main__":
     main()

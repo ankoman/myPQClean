@@ -422,6 +422,7 @@ class my_ML_KEM:
         rho = Gout[:32]
         sigma = Gout[32:]
         A = self.genA(rho)
+        # print(Rq.intt(A[0][0]))
         N = 0
 
         s = []
@@ -531,10 +532,10 @@ class my_ML_KEM:
 
         w = v - intt_stu
         m = Rq.msgencode(w)
-        print(m)
-        print(hex(m))
-        print(w)
-        input()
+        # print(m)
+        # print(hex(m))
+        # print(w)
+        # input()
 
         return m.to_bytes(32, 'big')
 

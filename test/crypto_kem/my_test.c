@@ -12,6 +12,7 @@
 #include "reduce.h"
 
 #define NTESTS 1
+#define N_U 15
 
 static void printbytes(const uint8_t *x, size_t xlen) {
     size_t i;
@@ -93,21 +94,45 @@ static void make_rot_array_to_mont(int16_t *p_o, poly *p_i){
     }
 }
 
-static int cnt_invalid_coeffs(int16_t inv, int16_t candidate) {
+static void polyvec_stay_comp(polyvec *r, const uint8_t a[KYBER_POLYVECCOMPRESSEDBYTES]) {
+    unsigned int i, j, k;
+
+    uint16_t t[4];
+    for (i = 0; i < KYBER_K; i++) {
+        for (j = 0; j < KYBER_N / 4; j++) {
+            t[0] = (a[0] >> 0) | ((uint16_t)a[1] << 8);
+            t[1] = (a[1] >> 2) | ((uint16_t)a[2] << 6);
+            t[2] = (a[2] >> 4) | ((uint16_t)a[3] << 4);
+            t[3] = (a[3] >> 6) | ((uint16_t)a[4] << 2);
+            a += 5;
+
+            for (k = 0; k < 4; k++) {
+                r->vec[i].coeffs[4 * j + k] = t[k] & 0x3FF;
+            }
+        }
+    }
+}
+
+static int cnt_invalid_coeffs(int16_t c, uint8_t base, poly *poly_pk, poly *poly_ct_comp){
     int cnt = 0;
-    uint16_t c;
+    uint16_t val;
 
-    c = PQCLEAN_MLKEM512_CLEAN_montgomery_reduce(inv * candidate);
+    for (int i = 0; i < N_U; i++) {
+        val = comp(PQCLEAN_MLKEM512_CLEAN_montgomery_reduce(c * poly_pk->coeffs[i + base]));
+        if (val == poly_ct_comp->coeffs[i + base]) {
+            cnt++;  // Count invalid coefficients
+        }
+    }
 
-    return 0;
+    return cnt;
 }
 
 static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES]){
     unsigned int i, row, pos, base;
-    uint8_t seed[KYBER_SYMBYTES];
-    int16_t a0_inv, center, candidate;
+    uint8_t seed[KYBER_SYMBYTES], cnt;
+    int16_t a0_inv, center, candidate, c;
     int16_t rot_ct[KYBER_N*2];
-    polyvec pkpv, A_[KYBER_K], u;
+    polyvec pkpv, A_[KYBER_K], u, u_comp;
 
     row = 0;
     pos = 0;
@@ -115,6 +140,7 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
 
     unpack_pk(&pkpv, seed, pk);
     PQCLEAN_MLKEM512_CLEAN_polyvec_decompress(&u, ct);              // Decompress ciphertext u
+    polyvec_stay_comp(&u_comp, ct);
     PQCLEAN_MLKEM512_CLEAN_gen_matrix(A_, seed, 0);                 // at is NTT domain. No transpose
     PQCLEAN_MLKEM512_CLEAN_poly_invntt_tomont(&(A_[row].vec[pos])); // Convert A_ to INTT and Montgomery domain
     // TODO: 値を正にしとかないとだめ？
@@ -122,25 +148,30 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
     a0_inv = 1306; // Inverse of 0x301 * 2^16 mod q
 
     for(int rot = 0; rot < KYBER_N; rot++) {
-        make_rot_array_to_mont(rot_ct, &u.vec[pos]);                // all returned values positive
-
+        make_rot_array_to_mont(rot_ct, &u.vec[pos]);                // all returned values positive and Montgomery domain
     }
     
     for(int rot = 0; rot < KYBER_N; rot++) {
         center = rot_ct[base + KYBER_N - rot]; // Center value
         for (int offset = -2; offset <= 2; offset++) {
             candidate = approx((center + offset) % KYBER_Q);         // TODO: Barrett reduction
-            if (candidate == center){     
-
+            if (candidate == center){
+                c = PQCLEAN_MLKEM512_CLEAN_montgomery_reduce(a0_inv * candidate);
+                if(c < 416 || c > 2913){
+                    cnt = cnt_invalid_coeffs(c, base, &(A_[row].vec[pos]), &u_comp.vec[pos]);
+                    if (cnt == N_U) {
+                        return 1; // pk-mask detected
+                    }
+                }
             }       
         }
     }
 
-    print_poly((poly *)rot_ct);
-    print_poly((poly *)(rot_ct + KYBER_N));
+    // print_poly((poly *)rot_ct);
+    // print_poly((poly *)(rot_ct + KYBER_N));
 
 
-    return 0; // TODO: Implement the actual mask check logic
+    return 0; // pk-mask undetected
 }
 
 int main(void) {
@@ -155,7 +186,7 @@ int main(void) {
     size_t read_bytes = fread(buffer, 1, sizeof(buffer), stdin);
 
     // pk-mask check
-    pk_mask_check(buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
+    return pk_mask_check(buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
 
     // Decapsulation
     // crypto_kem_dec(key_a, buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
