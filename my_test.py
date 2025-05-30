@@ -7,22 +7,14 @@ tv_m = bytes.fromhex('530e0f36e99c8035e47b17656dc8e6c24e2510ab587b93c6a9a9547816
 
 def main():
     inst = my_ml_kem.my_ML_KEM()
-    cp = subprocess.run(['../bin/my_test_ml-kem-512_clean'], input = tv_d + tv_z,\
-                        stdout=subprocess.PIPE)
-    out = cp.stdout.split()
-    print(out)
-    
-    pk = out[0]
-    sk = out[1]
-    ct = out[2]
-    key_b = out[3]
-    key_a = out[4]
-
-
-
     pk, sk = inst.cca_keygen(tv_z, tv_d)
-    print(pk.hex())
+    ct, K = inst.cca_enc(pk, tv_m)
 
+    cp = subprocess.run(['../bin/my_test_ml-kem-512_clean'], input = ct + pk,\
+                        stdout=subprocess.PIPE)
+    # print(cp)
+    out = cp.stdout.decode('utf-8').split('/n')
+    print(out[0])
 
 if __name__ == "__main__":
     main()

@@ -42,7 +42,8 @@ endif
 # This -Wall was supported by the European Commission through the ERC Starting Grant 805031 (EPOQUE)
 CFLAGS=-O3 -Wall -Wextra -Wpedantic -Wvla -Werror -std=c99 \
 	   -Wundef -Wshadow -Wcast-align -Wpointer-arith -Wmissing-prototypes\
-	   -fstrict-aliasing -fno-common -pipe -Wno-error=unused-function -Wno-error=unused-variable\
+	   -fstrict-aliasing -fno-common -pipe -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=unused-parameter\
+	   -Wno-error=unused-but-set-variable\
 	   -I$(COMMON_DIR) $(EXTRAFLAGS)
 
 # Number of tests run for functests
