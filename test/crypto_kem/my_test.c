@@ -9,7 +9,7 @@
 #include "poly.h"
 #include "kem.h"
 #include "indcpa.h"
-
+#include "reduce.h"
 
 #define NTESTS 1
 
@@ -76,27 +76,45 @@ static int16_t approx(int16_t coeff) {
     return decomp(comp(coeff));
 }
 
-static void make_rot_array(int16_t *p_o, poly *p_i){
-    memcpy(p_o + KYBER_N, p_i, KYBER_N * sizeof(int16_t));
-
+static void make_rot_array_to_mont(int16_t *p_o, poly *p_i){
+    // make all returned values positive
+    int16_t t;
+    int16_t r2 = 1353;
+    
     for (unsigned int i = 0; i < KYBER_N; i++) {
-        p_o[i] = -(p_i->coeffs[i]);
+        t = PQCLEAN_MLKEM512_CLEAN_montgomery_reduce((p_i->coeffs[i]) * r2);
+        if (t < 0) {
+            p_o[i + KYBER_N] = KYBER_Q + t;
+            p_o[i] = -t;
+        }else{
+            p_o[i + KYBER_N] = t;
+            p_o[i] = KYBER_Q - t;
+        }
     }
 }
 
+static int cnt_invalid_coeffs(int16_t inv, int16_t candidate) {
+    int cnt = 0;
+    uint16_t c;
+
+    c = PQCLEAN_MLKEM512_CLEAN_montgomery_reduce(inv * candidate);
+
+    return 0;
+}
+
 static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES]){
-    unsigned int i, row, pos, pivot;
+    unsigned int i, row, pos, base;
     uint8_t seed[KYBER_SYMBYTES];
-    int16_t a0_inv;
+    int16_t a0_inv, center, candidate;
     int16_t rot_ct[KYBER_N*2];
     polyvec pkpv, A_[KYBER_K], u;
 
     row = 0;
     pos = 0;
-    pivot = 0;
+    base = 0;
 
     unpack_pk(&pkpv, seed, pk);
-    PQCLEAN_MLKEM512_CLEAN_polyvec_decompress(&u, ct);               // Decompress ciphertext u
+    PQCLEAN_MLKEM512_CLEAN_polyvec_decompress(&u, ct);              // Decompress ciphertext u
     PQCLEAN_MLKEM512_CLEAN_gen_matrix(A_, seed, 0);                 // at is NTT domain. No transpose
     PQCLEAN_MLKEM512_CLEAN_poly_invntt_tomont(&(A_[row].vec[pos])); // Convert A_ to INTT and Montgomery domain
     // TODO: 値を正にしとかないとだめ？
@@ -104,7 +122,18 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
     a0_inv = 1306; // Inverse of 0x301 * 2^16 mod q
 
     for(int rot = 0; rot < KYBER_N; rot++) {
-        make_rot_array(rot_ct, &u.vec[pos]);                            // Values range positive
+        make_rot_array_to_mont(rot_ct, &u.vec[pos]);                // all returned values positive
+
+    }
+    
+    for(int rot = 0; rot < KYBER_N; rot++) {
+        center = rot_ct[base + KYBER_N - rot]; // Center value
+        for (int offset = -2; offset <= 2; offset++) {
+            candidate = approx((center + offset) % KYBER_Q);         // TODO: Barrett reduction
+            if (candidate == center){     
+
+            }       
+        }
     }
 
     print_poly((poly *)rot_ct);

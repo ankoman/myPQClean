@@ -9,6 +9,7 @@ def main():
     inst = my_ml_kem.my_ML_KEM()
     pk, sk = inst.cca_keygen(tv_z, tv_d)
     ct, K = inst.cca_enc(pk, tv_m)
+    inst.cca_dec(ct, sk)
 
     cp = subprocess.run(['../bin/my_test_ml-kem-512_clean'], input = ct + pk,\
                         stdout=subprocess.PIPE)
