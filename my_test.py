@@ -52,13 +52,39 @@ def get_pk_masked_ct(A_, c: bytearray, sk: bytearray, row: int, scalar: int, rot
 
     return c1+c2
 
+r = 2**16 % q
+r_inv = pow(r, q-2, q)
+
+def comp(val):
+    return ((((val << 10) + 1665)*1290167) >> 32) & 0x3ff   
+
+def decomp(val):
+    return ((val & 0x3ff) * q + 512) >> 10
+
+def Barrett_reduce(val):
+    kk = 14
+    m = 5
+    quotient = (val * m) >> kk
+    return val - quotient * q
+
+def K_reduce(val):
+    a0 = val & 0xff
+    a1 = val >> 8
+    return 13*a0 - a1
+
 def main():
+    # for i in range(q):
+    #     for j in range(q):
+    #         t = K_reduce(i*j)
+
+
     inst = my_ml_kem.my_ML_KEM()
     pk, sk = inst.cca_keygen(tv_z, tv_d)
     ct, K = inst.cca_enc(pk, tv_m)
     # inst.cca_dec(ct, sk)
     A_ = inst.genA(pk[-32:])
-    pk_masked_ct = get_pk_masked_ct(A_, ct, sk, 0, 1, 0)
+    # print(Rq.intt(A_[0][0]))
+    pk_masked_ct = get_pk_masked_ct(A_, ct, sk, 0, 99*r, 258)
 
     cp = subprocess.run(['../bin/my_test_ml-kem-512_clean'], input = pk_masked_ct + pk,\
                         stdout=subprocess.PIPE)

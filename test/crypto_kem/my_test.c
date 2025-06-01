@@ -104,6 +104,44 @@ static void make_rot_array_to_mont(int16_t *p_o, poly *p_i){
     }
 }
 
+static void make_rot_array(int16_t *p_o, int16_t *p_comp_o, poly *p_i){
+    // make all returned values positive
+    int16_t t;
+    
+    for (unsigned int i = 0; i < KYBER_N; i++) {
+        t = p_i->coeffs[i];
+        // Make negative
+        // if (t > 1664){   
+        //     t -= KYBER_Q;
+        // }
+        // p_o[i + KYBER_N] = t;
+        // p_o[i] = -t;
+
+        // Make positive
+        if (t < 0) {
+            p_o[i + KYBER_N] = KYBER_Q + t;
+            p_o[i] = -t;
+        }else{
+            p_o[i + KYBER_N] = t;
+            p_o[i] = KYBER_Q - t;
+        }
+        p_comp_o[i + KYBER_N] = comp(p_o[i + KYBER_N]);
+        p_comp_o[i] = comp(p_o[i]);
+    }
+}
+static void make_poly_positive(poly *p_i){
+    // make all returned values positive
+    int16_t t;
+    
+    for (unsigned int i = 0; i < KYBER_N; i++) {
+        t = p_i->coeffs[i];
+        // Make positive
+        if (t < 0) {
+            p_i->coeffs[i] = KYBER_Q + t;
+        }
+    }
+}
+
 static void polyvec_stay_comp(polyvec *r, const uint8_t a[KYBER_POLYVECCOMPRESSEDBYTES]) {
     unsigned int i, j, k;
 
@@ -123,13 +161,13 @@ static void polyvec_stay_comp(polyvec *r, const uint8_t a[KYBER_POLYVECCOMPRESSE
     }
 }
 
-static int cnt_invalid_coeffs(int16_t c, uint8_t base, poly *poly_pk, poly *poly_ct_comp){
+static int cnt_invalid_coeffs(int16_t c, uint8_t base, int rot, poly *poly_pk, poly *poly_ct_comp){
     int cnt = 0;
     uint16_t val;
 
     for (int i = 0; i < N_U; i++) {
-        val = comp(PQCLEAN_MLKEM512_CLEAN_montgomery_reduce(c * poly_pk->coeffs[i + base]));
-        if (val == poly_ct_comp->coeffs[i + base]) {
+        val = comp((c * poly_pk->coeffs[i + base]) % KYBER_Q);
+        if (val == poly_ct_comp->coeffs[i + base + KYBER_N - rot]) {
             cnt++;  // Count invalid coefficients
         }
     }
@@ -137,12 +175,24 @@ static int cnt_invalid_coeffs(int16_t c, uint8_t base, poly *poly_pk, poly *poly
     return cnt;
 }
 
+#define MULT t=(t*a)%KYBER_Q;
+#define SQR  t=(t*t)%KYBER_Q;
+
+static uint16_t inv(uint16_t a) {
+    uint32_t t;
+    t = a;
+    SQR MULT SQR SQR SQR MULT SQR MULT SQR MULT
+    SQR MULT SQR MULT SQR MULT SQR MULT SQR MULT
+    return t;
+}
+
 static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES]){
     unsigned int i, row, pos, base;
     uint8_t seed[KYBER_SYMBYTES], cnt;
     int16_t a0_inv, center, candidate, c;
     int16_t rot_ct[KYBER_N*2];
-    polyvec pkpv, A_[KYBER_K], u, u_comp;
+    int16_t rot_ct_comp[KYBER_N*2];
+    polyvec pkpv, A_[KYBER_K], u;
 
     int DEBUG_ROT = 0, DEBUG_OFFSET = 0, DEBUG_CAND = 0, DEBUG_C = 0;
 
@@ -151,31 +201,33 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
     base = 0;
 
     unpack_pk(&pkpv, seed, pk);
+    //polyvec_stay_comp(&u_comp, ct);
     PQCLEAN_MLKEM512_CLEAN_polyvec_decompress(&u, ct);              // Decompress ciphertext u
-    polyvec_stay_comp(&u_comp, ct);
     PQCLEAN_MLKEM512_CLEAN_gen_matrix(A_, seed, 0);                 // at is NTT domain. No transpose
-    PQCLEAN_MLKEM512_CLEAN_poly_invntt_tomont(&(A_[row].vec[pos])); // Convert A_ to INTT and Montgomery domain
+    PQCLEAN_MLKEM512_CLEAN_poly_invntt_tomont(&(A_[row].vec[pos])); // Convert A_ to INTT and Montgomery domain. Values can be negative
+    make_poly_positive(&(A_[row].vec[pos]));                        // Make all values positive
     // TODO: 値を正にしとかないとだめ？
     // TODO: base処理
-    a0_inv = 1306; // Inverse of 0x301 * 2^16 mod q
-
-    for(int rot = 0; rot < KYBER_N; rot++) {
-        make_rot_array_to_mont(rot_ct, &u.vec[pos]);                // all returned values positive and Montgomery domain
-    }
+    a0_inv = inv(A_[row].vec[pos].coeffs[0]); // Inverse of 0x301 * 2^16 mod q
+    // printf("%d\n", a0_inv);
+    
+    make_rot_array(rot_ct, rot_ct_comp, &u.vec[pos]);                // all returned values positive
     
     for(int rot = 0; rot < KYBER_N; rot++) {
         DEBUG_ROT++;
         center = rot_ct[base + KYBER_N - rot]; // Center value
         for (int offset = -2; offset <= 2; offset++) {
             DEBUG_OFFSET++;
-            candidate = approx((center + offset) % KYBER_Q);         // TODO: Barrett reduction
-            if (candidate == center){
+            candidate = (center + offset) % KYBER_Q;         // TODO: Barrett reduction
+
+            if (approx(candidate) == center){
                 DEBUG_CAND++;
-                c = PQCLEAN_MLKEM512_CLEAN_montgomery_reduce(a0_inv * candidate);
+                c = (a0_inv * candidate) % KYBER_Q;
+                // printf("c=%d\n", c);
                 if(c < 416 || c > 2913){
                     DEBUG_C++;
-                    cnt = cnt_invalid_coeffs(c, base, &(A_[row].vec[pos]), &u_comp.vec[pos]);
-                    // printf("%d\n", cnt);
+                    cnt = cnt_invalid_coeffs(c, base, rot, &(A_[row].vec[pos]), (poly *)&rot_ct_comp);
+                    // printf("cnt=%d\n", cnt);
                     if (cnt == N_U) {
                         return 1; // pk-mask detected
                     }
@@ -184,20 +236,19 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
         }
     }
     //printf("%d, %d, %d, %d\n", DEBUG_ROT, DEBUG_OFFSET, DEBUG_CAND, DEBUG_C);
-
-    // print_poly((poly *)rot_ct);
-    // print_poly((poly *)(rot_ct + KYBER_N));
+    // print_poly((poly *)&u_comp.vec[pos]);
+    // print_poly((poly *)(rot_ct_comp));
+    // print_poly((poly *)(rot_ct_comp + KYBER_N));
 
 
     return 0; // pk-mask undetected
 }
 
-#define N_TESTS 1
-
+#define N_TESTS 100000
 
 int main(void) {
-    uint64_t start = rdtsc();
     uint8_t key_a[CRYPTO_BYTES];
+    int res = 0;
     // uint8_t pk[CRYPTO_PUBLICKEYBYTES];
     // uint8_t ct[CRYPTO_CIPHERTEXTBYTES];
     // uint8_t sk_a[CRYPTO_SECRETKEYBYTES];
@@ -207,16 +258,19 @@ int main(void) {
     uint8_t buffer[CRYPTO_CIPHERTEXTBYTES + CRYPTO_PUBLICKEYBYTES];
     size_t read_bytes = fread(buffer, 1, sizeof(buffer), stdin);
 
+    uint64_t start = rdtsc();
     // pk-mask check
     for (volatile int i = 0; i < N_TESTS; i++){
-            pk_mask_check(buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
+        res = res + pk_mask_check(buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
+        // crypto_kem_dec(key_a, buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
     }
-
     uint64_t end = rdtsc();
     printf("Cycles: %f\n", (double)(end - start)/N_TESTS);
+    printf("res= %d\n", res);
+
     // Decapsulation
     // crypto_kem_dec(key_a, buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
     // printbytes(key_a, CRYPTO_BYTES);
 
-    return 0;
+    return res;
 }
