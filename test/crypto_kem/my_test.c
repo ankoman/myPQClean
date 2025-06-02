@@ -244,7 +244,17 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
     return 0; // pk-mask undetected
 }
 
-#define N_TESTS 100000
+#define N_TESTS 1000
+
+#include <emmintrin.h>  // SSE2
+#include <stdint.h>
+
+static void flush_cache(void *p, size_t size) {
+    char *cp = (char *)p;
+    for (size_t i = 0; i < size; i += 64) {  // 64B = cache line size
+        _mm_clflush(cp + i);
+    }
+}
 
 int main(void) {
     uint8_t key_a[CRYPTO_BYTES];
@@ -261,8 +271,9 @@ int main(void) {
     uint64_t start = rdtsc();
     // pk-mask check
     for (volatile int i = 0; i < N_TESTS; i++){
+        //flush_cache(buffer, CRYPTO_CIPHERTEXTBYTES + CRYPTO_PUBLICKEYBYTES);
         res = res + pk_mask_check(buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
-        // crypto_kem_dec(key_a, buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
+        //crypto_kem_dec(key_a, buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
     }
     uint64_t end = rdtsc();
     printf("Cycles: %f\n", (double)(end - start)/N_TESTS);
