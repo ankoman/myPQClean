@@ -217,10 +217,11 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
     for(int rot = 0; rot < KYBER_N; rot++) {
         DEBUG_ROT++;
         center = rot_ct[base + KYBER_N - rot]; // Center value
+        // TODO: Eliminate 0 center
+
         for (int offset = -2; offset <= 2; offset++) {
             DEBUG_OFFSET++;
             candidate = (center + offset) % KYBER_Q;         // TODO: Barrett reduction
-            // TODO: Eliminate 0 candidate
 
             if (approx(candidate) == center){
                 DEBUG_CAND++;
