@@ -208,10 +208,11 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
     make_poly_positive(&(A_[row].vec[pos]));                        // Make all values positive
     // TODO: 値を正にしとかないとだめ？
     // TODO: base処理
+    // TODO: 0逆元の除外
     a0_inv = inv(A_[row].vec[pos].coeffs[0]); // Inverse of 0x301 * 2^16 mod q
     // printf("%d\n", a0_inv);
     
-    make_rot_array(rot_ct, rot_ct_comp, &u.vec[pos]);                // all returned values positive
+    make_rot_array(rot_ct, rot_ct_comp, &u.vec[pos]);                // u is decompressed. All returned values positive
     
     for(int rot = 0; rot < KYBER_N; rot++) {
         DEBUG_ROT++;
@@ -219,6 +220,7 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
         for (int offset = -2; offset <= 2; offset++) {
             DEBUG_OFFSET++;
             candidate = (center + offset) % KYBER_Q;         // TODO: Barrett reduction
+            // TODO: Eliminate 0 candidate
 
             if (approx(candidate) == center){
                 DEBUG_CAND++;
@@ -235,7 +237,7 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
             }       
         }
     }
-    //printf("%d, %d, %d, %d\n", DEBUG_ROT, DEBUG_OFFSET, DEBUG_CAND, DEBUG_C);
+    // printf("%d, %d, %d, %d\n", DEBUG_ROT, DEBUG_OFFSET, DEBUG_CAND, DEBUG_C);
     // print_poly((poly *)&u_comp.vec[pos]);
     // print_poly((poly *)(rot_ct_comp));
     // print_poly((poly *)(rot_ct_comp + KYBER_N));
@@ -244,7 +246,7 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
     return 0; // pk-mask undetected
 }
 
-#define N_TESTS 1000
+#define N_TESTS 100000
 
 #include <emmintrin.h>  // SSE2
 #include <stdint.h>
