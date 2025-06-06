@@ -61,7 +61,7 @@ static inline uint64_t rdtsc(){
 static void unpack_pk(polyvec *pk,
                       uint8_t seed[KYBER_SYMBYTES],
                       const uint8_t packedpk[KYBER_INDCPA_PUBLICKEYBYTES]) {
-    PQCLEAN_MLKEM512_CLEAN_polyvec_frombytes(pk, packedpk);
+    PQCLEAN_MLKEM768_CLEAN_polyvec_frombytes(pk, packedpk);
     memcpy(seed, packedpk + KYBER_POLYVECBYTES, KYBER_SYMBYTES);
 }
 
@@ -93,7 +93,7 @@ static void make_rot_array_to_mont(int16_t *p_o, poly *p_i){
     int16_t r2 = 1353;
     
     for (unsigned int i = 0; i < KYBER_N; i++) {
-        t = PQCLEAN_MLKEM512_CLEAN_montgomery_reduce((p_i->coeffs[i]) * r2);
+        t = PQCLEAN_MLKEM768_CLEAN_montgomery_reduce((p_i->coeffs[i]) * r2);
         if (t < 0) {
             p_o[i + KYBER_N] = KYBER_Q + t;
             p_o[i] = -t;
@@ -202,9 +202,9 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
 
     unpack_pk(&pkpv, seed, pk);
     //polyvec_stay_comp(&u_comp, ct);
-    PQCLEAN_MLKEM512_CLEAN_polyvec_decompress(&u, ct);              // Decompress ciphertext u
-    PQCLEAN_MLKEM512_CLEAN_gen_matrix(A_, seed, 0);                 // at is NTT domain. No transpose
-    PQCLEAN_MLKEM512_CLEAN_poly_invntt_tomont(&(A_[row].vec[pos])); // Convert A_ to INTT and Montgomery domain. Values can be negative
+    PQCLEAN_MLKEM768_CLEAN_polyvec_decompress(&u, ct);              // Decompress ciphertext u
+    PQCLEAN_MLKEM768_CLEAN_gen_matrix(A_, seed, 0);                 // at is NTT domain. No transpose
+    PQCLEAN_MLKEM768_CLEAN_poly_invntt_tomont(&(A_[row].vec[pos])); // Convert A_ to INTT and Montgomery domain. Values can be negative
     make_poly_positive(&(A_[row].vec[pos]));                        // Make all values positive
     // TODO: 値を正にしとかないとだめ？
     // TODO: base処理
@@ -276,7 +276,7 @@ int main(void) {
     for (volatile int i = 0; i < N_TESTS; i++){
         //flush_cache(buffer, CRYPTO_CIPHERTEXTBYTES + CRYPTO_PUBLICKEYBYTES);
         res = res + pk_mask_check(buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
-        //crypto_kem_dec(key_a, buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
+        crypto_kem_dec(key_a, buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
     }
     uint64_t end = rdtsc();
     printf("Cycles: %f\n", (double)(end - start)/N_TESTS);

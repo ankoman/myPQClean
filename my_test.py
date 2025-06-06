@@ -84,9 +84,9 @@ def main():
     # inst.cca_dec(ct, sk)
     A_ = inst.genA(pk[-32:])
     # print(Rq.intt(A_[0][0]))
-    pk_masked_ct = get_pk_masked_ct(A_, ct, sk, 0, 99*r, 258)
+    pk_masked_ct = get_pk_masked_ct(A_, ct, sk, 0, 601*r, 251)
 
-    cp = subprocess.run(['../bin/my_test_ml-kem-512_clean'], input = pk_masked_ct + pk,\
+    cp = subprocess.run(['../bin/my_test_ml-kem-768_clean'], input = pk_masked_ct + pk,\
                         stdout=subprocess.PIPE)
     print(cp)
     # out = cp.stdout.decode('utf-8').split('/n')

@@ -6,12 +6,12 @@ import copy
 #import sha3
 
 ### 512
-k = 2
-eta1 = 3
+# k = 2
+# eta1 = 3
 
 ### 768
-# k = 3
-# eta1 = 2
+k = 3
+eta1 = 2
 
 ### 1024
 # k = 4

@@ -2,7 +2,7 @@
 
 # override as desired
 TYPE=kem
-SCHEME=ml-kem-512
+SCHEME=ml-kem-768
 IMPLEMENTATION=clean
 KAT_RNG=nist
 
