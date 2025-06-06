@@ -11,7 +11,7 @@
 #include "indcpa.h"
 #include "reduce.h"
 
-#define N_U 15
+#define N_coe 15
 
 static void printbytes(const uint8_t *x, size_t xlen) {
     size_t i;
@@ -165,7 +165,7 @@ static int cnt_invalid_coeffs(int16_t c, uint8_t base, int rot, poly *poly_pk, p
     int cnt = 0;
     uint16_t val;
 
-    for (int i = 0; i < N_U; i++) {
+    for (int i = 0; i < N_coe; i++) {
         val = comp((c * poly_pk->coeffs[i + base]) % KYBER_Q);
         if (val == poly_ct_comp->coeffs[i + base + KYBER_N - rot]) {
             cnt++;  // Count invalid coefficients
@@ -231,7 +231,7 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
                     DEBUG_C++;
                     cnt = cnt_invalid_coeffs(c, base, rot, &(A_[row].vec[pos]), (poly *)&rot_ct_comp);
                     // printf("cnt=%d\n", cnt);
-                    if (cnt == N_U) {
+                    if (cnt == N_coe) {
                         return 1; // pk-mask detected
                     }
                 }
