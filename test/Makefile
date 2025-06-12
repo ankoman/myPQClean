@@ -2,7 +2,7 @@
 
 # override as desired
 TYPE=kem
-SCHEME=ml-kem-768
+SCHEME=ml-kem-512
 IMPLEMENTATION=clean
 KAT_RNG=nist
 
@@ -77,7 +77,7 @@ clean-interop:
 endif
 
 .PHONY: my_test
-functest: $(DEST_DIR)/my_test_$(SCHEME)_$(IMPLEMENTATION)
+my_test: $(DEST_DIR)/my_test_$(SCHEME)_$(IMPLEMENTATION)
 
 .PHONY: functest
 functest: $(DEST_DIR)/functest_$(SCHEME)_$(IMPLEMENTATION)

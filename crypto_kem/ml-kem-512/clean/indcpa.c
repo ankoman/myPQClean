@@ -6,6 +6,7 @@
 #include "randombytes.h"
 #include "symmetric.h"
 #include <stddef.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -294,6 +295,14 @@ void PQCLEAN_MLKEM512_CLEAN_indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
     pack_ciphertext(c, &b, &v);
 }
 
+static void printbytes(const uint8_t *x, size_t xlen) {
+    size_t i;
+    for (i = 0; i < xlen; i++) {
+        printf("%02x", x[i]);
+    }
+    printf("\n");
+}
+
 /*************************************************
 * Name:        PQCLEAN_MLKEM512_CLEAN_indcpa_dec
 *
@@ -312,6 +321,7 @@ void PQCLEAN_MLKEM512_CLEAN_indcpa_dec(uint8_t m[KYBER_INDCPA_MSGBYTES],
                                        const uint8_t sk[KYBER_INDCPA_SECRETKEYBYTES]) {
     polyvec b, skpv;
     poly v, mp;
+    printf("aaa");
 
     unpack_ciphertext(&b, &v, c);
     unpack_sk(&skpv, sk);
@@ -322,6 +332,16 @@ void PQCLEAN_MLKEM512_CLEAN_indcpa_dec(uint8_t m[KYBER_INDCPA_MSGBYTES],
 
     PQCLEAN_MLKEM512_CLEAN_poly_sub(&mp, &v, &mp);
     PQCLEAN_MLKEM512_CLEAN_poly_reduce(&mp);
+    uint8_t coins[32];  //256 bits
+    randombytes(coins, 32);
+    uint8_t tau = 200;
+    int16_t r;
+    for (int i = 0; i < 256; i++) {
+        r = (coins[i/8] >> (i%8)) & 0x01;
+        r = -(!r);
+        //printf("%d\n", r);
+        mp.coeffs[i] = (mp.coeffs[i] + tau * r);
+    }
 
     PQCLEAN_MLKEM512_CLEAN_poly_tomsg(m, &mp);
 }
