@@ -321,7 +321,7 @@ void PQCLEAN_MLKEM512_CLEAN_indcpa_dec(uint8_t m[KYBER_INDCPA_MSGBYTES],
                                        const uint8_t sk[KYBER_INDCPA_SECRETKEYBYTES]) {
     polyvec b, skpv;
     poly v, mp;
-    printf("aaa");
+    //printf("aaa");
 
     unpack_ciphertext(&b, &v, c);
     unpack_sk(&skpv, sk);
