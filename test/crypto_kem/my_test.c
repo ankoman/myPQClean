@@ -165,10 +165,11 @@ static int cnt_invalid_coeffs(int16_t c, uint8_t base, int rot, poly *poly_pk, p
     int cnt = 0;
     uint16_t val;
 
+    int comp_base_idx = base + KYBER_N - rot;
     for (int i = 0; i < N_coe; i++) {
-        val = comp((c * poly_pk->coeffs[i + base]) % KYBER_Q);
-        if (val == poly_ct_comp->coeffs[i + base + KYBER_N - rot]) {
-            cnt++;  // Count invalid coefficients
+        val = comp((c * poly_pk->coeffs[base + i]) % KYBER_Q);
+        if (val == poly_ct_comp->coeffs[comp_base_idx + i]) {
+            cnt++;
         }
     }
 
@@ -221,7 +222,7 @@ static int pk_mask_check(uint8_t ct[KYBER_INDCPA_BYTES], const uint8_t pk[KYBER_
 
         for (int offset = -2; offset <= 2; offset++) {
             DEBUG_OFFSET++;
-            candidate = (center + offset) % KYBER_Q;         // TODO: Barrett reduction
+            candidate = (center + offset) % KYBER_Q;         // TODO: Barrett reduction -> slow
 
             if (approx(candidate) == center){
                 DEBUG_CAND++;
@@ -276,7 +277,7 @@ int main(void) {
     for (volatile int i = 0; i < N_TESTS; i++){
         //flush_cache(buffer, CRYPTO_CIPHERTEXTBYTES + CRYPTO_PUBLICKEYBYTES);
         res = res + pk_mask_check(buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
-        crypto_kem_dec(key_a, buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
+        //crypto_kem_dec(key_a, buffer, buffer + CRYPTO_CIPHERTEXTBYTES);
     }
     uint64_t end = rdtsc();
     printf("Cycles: %f\n", (double)(end - start)/N_TESTS);
